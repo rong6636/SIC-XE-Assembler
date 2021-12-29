@@ -1,6 +1,7 @@
-from os import makedirs, system
-import re
 import json
+import re
+import os
+
 
 class SICXE_Assembler():
     """
@@ -14,6 +15,7 @@ class SICXE_Assembler():
         """
         內部變數定義
         """
+        self.__code_file = ""
         self.__SICXE_SET = []
         self.__code = []
         self.__symtab = {}
@@ -23,11 +25,15 @@ class SICXE_Assembler():
         self.__machine_code = ""
 
     
-    def load(self, code_file = "Figure2.5.txt", set_file="SICXE_instruction_set.json"):
+    def load(self, code_file = "", set_file="SICXE_instruction_set.json"):
+        self.__code_file = code_file
         self.__get_code_file(code_file)
         self.__get_SICXE_SET(set_file)
     
     def run(self):
+        if len(self.__code) <= 0:
+            print ("no code")
+            return
         self.pass1()
         self.pass2()
 
@@ -253,10 +259,7 @@ class SICXE_Assembler():
     def __create_machine_code(self, smb='^'):
         self.__length = int(self.__code[len(self.__code)-1]["Loc"], 16)-int(self.__code[self.__start]["Loc"], 16)
         
-        # Col. 1: H
-        # Col. 2-7: Program name
-        # Col. 8-13: starting address of object program
-        # Col. 14-19: length of object program in bytes
+        # Header
         machine_code = "H"+smb
         machine_code += self.__name.ljust(6)
         machine_code += smb+self.__code[self.__start]["Loc"].zfill(6)
@@ -286,6 +289,12 @@ class SICXE_Assembler():
                 else:
                     tRecord[-1][1] += len(obc)//2
                     tRecord[-1][2] += obc+smb
+        for t in tRecord:
+            machine_code += "T"+smb
+            machine_code += t[0].zfill(6)+smb
+            machine_code += hex(t[1])[2:].zfill(2)+smb
+            machine_code += t[2][:-1]+"\n"
+
         
         # Modification record
         mRecord = []
@@ -296,18 +305,12 @@ class SICXE_Assembler():
                 mRecord.append([start_loc//2, self.__code[i]["MR"]])
             mc_count+=len(self.__code[i]["object_code"])
 
-
-        for t in tRecord:
-            machine_code += "T"+smb
-            machine_code += t[0].zfill(6)+smb
-            machine_code += hex(t[1])[2:].zfill(2)+smb
-            machine_code += t[2][:-1]+"\n"
-
         for m in mRecord:
             machine_code += "M"+smb
             machine_code += hex(m[0])[2:].zfill(6)+smb
             machine_code += hex(m[1])[2:].zfill(2)+"\n"
-
+        
+        # End
         machine_code += "E"+smb
         machine_code += self.__code[self.__start]["Loc"].zfill(6)
         machine_code+="\n\n\n"
@@ -315,6 +318,9 @@ class SICXE_Assembler():
         self.__machine_code = machine_code.upper()
         
     def cout(self):
+        if len(self.__code) <= 0 :
+            print ("no code ")
+            return
         print ("SYMTAB\n===========\n", self.__symtab, "\n")
         print ("PROGRAM\n===========")
         for i in range(len(self.__code)):
@@ -335,10 +341,38 @@ class SICXE_Assembler():
             print ("")
         print ("\nMACHINE CODE\n===========")
         print (self.__machine_code)
+    
+    def output_object_program(self):
+        if not os.path.exists("./output"):
+            os.makedirs("./output")
+        path = "output/ob_"+os.path.basename(self.__code_file)
+        f = open(path, 'w')
+        f.write(self.__machine_code)
+        f.close()
+        
+    def output_assembly_code(self):
+        if not os.path.exists("./output"):
+            print ("./output")
+            os.makedirs("./output")
+        path = "output/as_"+os.path.basename(self.__code_file)
+        f = open(path, 'w')
+        for i in range(len(self.__code)):
+            if self.__code[i]["mnemonic"] == "END": # 不顯示END的LOC
+                print('%-7s' % "", end="", file=f)
+            else:
+                print('%-7s' % self.__code[i]["Loc"], end="", file=f)
+            print('%-8s' % self.__code[i]["lable"], end="", file=f)
+            print('%-7s' % self.__code[i]["mnemonic"], end="", file=f)
+            print('%-11s' % self.__code[i]["operand"], end="", file=f)
+            
+            if "object_code" in self.__code[i]: # 沒object_code
+                print('%-8s' % self.__code[i]["object_code"], end="", file=f)
+            else:
+                print('%-8s' % "", end="", file=f)
+                
+            # print('%2s' % self.__code[i]["ob_len"])
+            print ("", file=f)
+        f.close()
+
 
         
-
-f26 = SICXE_Assembler()
-f26.load()
-f26.run()
-f26.cout()
