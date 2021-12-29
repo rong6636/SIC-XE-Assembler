@@ -1,23 +1,23 @@
-from os import makedirs, system
+from os import system
 import re
 import json
 
 
-def read_SICXE_instruction_set():
-    with open('SICXE_instruction_set.json', 'r', encoding='utf8') as jfile:
+def get_SIC_instruction_set():
+    with open('SIC_instruction_set.json', 'r', encoding='utf8') as jfile:
         SIC_instruction_set = json.load(jfile)
         jfile.close()
     return SIC_instruction_set
 
 
-def read_assembly_code_file(input_path="Figure2.5.txt"):
+def get_SIC_from_file(input_path="Figure2.5.txt"):
     f = None
-    ass = []
+    sic = []
     try:
         f = open(input_path, 'r')
         for line in f.readlines():
             item = re.split(r'\s+', line, 2)
-            ass.append(
+            sic.append(
                 {"lable": item[0], "mnemonic": item[1], "operand": item[2].strip()})
     except IOError:
         print('ERROR: can not found ' + input_path)
@@ -26,11 +26,11 @@ def read_assembly_code_file(input_path="Figure2.5.txt"):
     finally:
         if f:
             f.close()
-    return ass
+    return sic
 
 # create LOC
 
-def formatting_Loc(loc):
+def format_Loc(loc):
     _loc = loc[2:]
     while(len(_loc)<4):
         _loc = "0"+_loc
@@ -41,7 +41,7 @@ def create_Loc(sic):
     for iStart in range(len(sic)):
         if sic[iStart]["mnemonic"] == "START":
             current_Loc = hex(int(sic[iStart]["operand"], 16))
-            sic[iStart]["Loc"] = formatting_Loc(current_Loc)
+            sic[iStart]["Loc"] = format_Loc(current_Loc)
             break
 
     for i in range(iStart+1, len(sic)):
@@ -50,7 +50,7 @@ def create_Loc(sic):
 
         # need to display Loc of mnemonic
         if mnemonic in SIC_SET["operand"] or mnemonic in SIC_SET["variable"] or mnemonic == "END" :
-            sic[i]["Loc"] = formatting_Loc(current_Loc)  # Loc
+            sic[i]["Loc"] = format_Loc(current_Loc)  # Loc
 
             if mnemonic in SIC_SET["operand"]:
                 current_Loc = hex(int(current_Loc, 16) +
@@ -144,7 +144,6 @@ def create_object_code(sic):
         mnemonic = sic[i]["mnemonic"]
         operand = sic[i]["operand"]
         object_code = ""
-        modification_record = 0
 
         # opcode - operand
         if mnemonic in SIC_SET["operand"]:
@@ -161,26 +160,26 @@ def create_object_code(sic):
                 p = 0
                 e = 0
                 disp = "0x0"
-                operand_key = operand
                 if len(operand) > 0:
                     # n i
                     if operand[0] == "@":
                         n = 1
                         im = 0
-                        operand_key = operand_key[1:]
                     elif operand[0] == "#":
                         n = 0
                         im = 1
-                        operand_key = operand_key[1:]
                     # x
                     if "," in operand:
                         x = 1
-                        operand_key = operand_key[:operand_key.find(",")]
                     # e
                     if SIC_SET["operand"][mnemonic][0] == 4:
                         e = 1
-
                     # b p and disp
+                    operand_key = operand
+                    if x == 1:
+                        operand_key = operand_key[:operand_key.find(",")]
+                    if operand[0] in ["#", "@"]:
+                        operand_key = operand_key[1:]
                     if e == 0:
                         if operand_key in symtab:
                             print("symtab[operand_key]", symtab[operand_key])
@@ -201,7 +200,6 @@ def create_object_code(sic):
                     if e == 1:
                         if operand_key in symtab:
                             disp = symtab[operand_key]
-                            modification_record = 5
 
                     print(opcode, n, im, x, b, p, e, bin(int(disp, 16))[2:])
                     object_code = format_opcode_ni(
@@ -223,7 +221,7 @@ def create_object_code(sic):
 
         if mnemonic == "BASE":
             base = symtab[operand]
-            print("BASE====", base)
+            print("BASE", base)
 
         # opcode - variable
         elif mnemonic == "BYTE":
@@ -235,156 +233,41 @@ def create_object_code(sic):
             elif operand[0] == 'X':
                 object_code = operand[2:-1]
         elif mnemonic == "WORD":
-            object_code = hex(int(operand))[2:].zfill(6)
+            object_code = hex(int(operand))[2:]
 
         sic[i]["object_code"] = object_code.upper()
-        sic[i]["ob_len"] = len(sic[i]["object_code"])
-        sic[i]["MR"] = modification_record
         print("--------")
     return sic
 
-# def get_machine_code(sic, symbol=''):
-#     r=0
-#     while r<len(sic):
-#         if sic[r]["Loc"] == "":
-#             sic.pop(r)
-#             r = -1
-#         r+=1
-#     machine_code = ""
-#     # Header part
-#     for iSTART in range(len(sic)): # find "START"
-#         if sic[iSTART]["mnemonic"] == "START":
-#             machine_code += "H"+symbol # 1 Header
-#             machine_code += sic[iSTART]["lable"].ljust(6)+symbol  # 2-7 program name 
-#             machine_code += sic[iSTART]["Loc"].zfill(6)+symbol # 8-13 start loc
-#             _len = str(int(sic[len(sic)-1]["Loc"], 16)-int(sic[iSTART]["Loc"], 16))
-#             machine_code += _len.zfill(6)+"\n" # 14-19 length
-#             break
-#     # Text part
-#     i = iSTART
-#     tmp_start_loc = sic[iSTART]["Loc"]
-#     tmp_mCode = ""
-#     while (i<len(sic)-1):
-#         i+=1
-#         print (sic[i])
-#         # 若tmp+object_code 長度大於60
-#         if len(tmp_mCode+sic[i]["object_code"])>60 or :
-#             print ("tmp", tmp_mCode)
-#             machine_code += "T"+symbol
-#             machine_code += tmp_start_loc.zfill(6)+symbol # start loc
-#             print (sic[i-1]["Loc"])
-#             print (int(sic[i-1]["Loc"], 16))
-#             print (int(tmp_start_loc, 16))
-#             machine_code += hex(len(tmp_mCode))[2:].zfill(2)+symbol # start loc
-#             machine_code += tmp_mCode+"\n"
-
-#             # zeoring
-#             tmp_start_loc = sic[i]["Loc"]
-#             tmp_mCode = sic[i]["object_code"]
-#         else:
-#             tmp_mCode = tmp_mCode+sic[i]["object_code"]
-
-#     # End part
-#     machine_code += "E"+sic[iSTART]["Loc"].zfill(6) # 14-19 length
-        
-#     return machine_code
-
-def get_machine_code(sic, smb='^'):
-
-    # Header record part
-    program_name = ""
-    program_startLoc = ""
-    program_len = ""
-    for iSTART in range(len(sic)):
-        # find "START"
+def create_object_program(sic):
+    opContain = ""
+    # Header part
+    for iSTART in range(len(sic)): # find "START"
         if sic[iSTART]["mnemonic"] == "START":
-            program_name = sic[iSTART]["lable"]
-            program_startLoc = sic[iSTART]["Loc"]
-            program_len = int(sic[len(sic)-1]["Loc"], 16)-int(sic[iSTART]["Loc"], 16)
+            opContain += "H" # 1 Header
+            opContain += sic[iSTART]["lable"].ljust(6) # 2-7 program name 
+            opContain += sic[iSTART]["Loc"].ljust(6) # 8-13 program name 
+            sic[len(sic)]["Loc"]-sic[iSTART]["Loc"]
+            opContain += sic[iSTART]["Loc"].ljust(6) # 14-19 length
             break
-    
-    # Text record part
-    tRecord = []
-    newRow = True
-    
-    for i in range(len(sic)-1):
-        i += 1
-        loc = sic[i]["Loc"]
-        mmn = sic[i]["mnemonic"]
-        obc = sic[i]["object_code"]
+    return opContain
 
-        if mmn == 'RESW' or mmn == 'RESB':
-            # RESW, RESB interrupt continuous address.
-            newRow = True
-        if obc != '':
-            if newRow:
-                # [起始位置,  長度, CODE]
-                tRecord.append([loc, 0, ""])
-                newRow = False
-
-            if tRecord[-1][1]*2+len(obc) > 60:
-                tRecord.append([loc, len(obc)//2, obc])
-            else:
-                tRecord[-1][1] += len(obc)//2
-                tRecord[-1][2] += smb+obc
-    
-    # Modification record
-    mRecord = []
-    mc_count = 0
-    for i in range(len(sic)-1):
-        if sic[i]["MR"] > 0:
-            start_loc = mc_count+(len(sic[i]["object_code"])-sic[i]["MR"])
-            mRecord.append([start_loc//2, sic[i]["MR"]])
-        mc_count+=len(sic[i]["object_code"])
-
-
-    
-    # machine code
-    machine_code = "H"+smb
-    machine_code += program_name.ljust(6)
-    machine_code += smb+program_startLoc.zfill(6)
-    machine_code += smb+hex(program_len)[2:].zfill(6)+"\n"
-
-    for t in tRecord:
-        machine_code += "T"+smb
-        machine_code += t[0].zfill(6)+smb
-        machine_code += hex(t[1])[2:].zfill(2)+smb
-        machine_code += t[2]+"\n"
-
-    for m in mRecord:
-        machine_code += "M"+smb
-        machine_code += hex(m[0])[2:].zfill(6)+smb
-        machine_code += hex(m[1])[2:].zfill(2)+"\n"
-
-    machine_code += "E"+smb
-    machine_code += program_startLoc.zfill(6)
-    machine_code+="\n\n\n"
-
-    return machine_code
-
-
-sic = read_assembly_code_file()
+sic = get_SIC_from_file()
 
 # for i in range(len(sic)):
 #     print(sic[i])
 
-SIC_SET = read_SICXE_instruction_set()
+SIC_SET = get_SIC_instruction_set()
 # print(len(SIC_SET["operand"]))
 
 sic = create_Loc(sic)
 symtab = create_symtab(sic)
 sic = create_object_code(sic)
 
-
 for i in range(len(sic)):
-    if sic[i]["mnemonic"] == "END": # 不顯示END的LOC
-        print('%5s' % "", end="")
-    else:
+    if sic[i]["mnemonic"] != "END": # 不顯示END的LOC
         print('%5s' % sic[i]["Loc"], end="")
     print('%7s' % sic[i]["lable"], end="")
     print('%7s' % sic[i]["mnemonic"], end="")
     print('%14s' % sic[i]["operand"], end="")
-    print('%10s' % sic[i]["object_code"], end="")
-    print('%2s' % sic[i]["ob_len"])
-
-print (get_machine_code(sic))
+    print('%10s' % sic[i]["object_code"])
