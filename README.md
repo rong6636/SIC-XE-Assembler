@@ -9,6 +9,9 @@ NTCU CS System Programming and Assembler, Final project
   2) 完整 assembly_code
 
 ## DEMO
+input
+![image](https://user-images.githubusercontent.com/61511627/147974060-db822524-d710-4251-b077-359b5cf21e87.png)
+output
 ![image](https://user-images.githubusercontent.com/61511627/147973924-4ed718e2-1f53-4583-a6a2-61eca8280afd.png)
 
 ![image](https://user-images.githubusercontent.com/61511627/147973905-3efda499-5e9b-4349-b475-6282d7058339.png)
